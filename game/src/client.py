@@ -13,8 +13,10 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
+# Python 从终端读东西
+from sys import stdin
 
-def main():
+def operate(op, user_id, user_name, user_score):
     # Make socket
     transport = TSocket.TSocket('localhost', 9090)
 
@@ -61,12 +63,21 @@ def main():
     # print('Check log: %s' % log.value)
 
     # 业务逻辑
-    user = User(1, "zsy", 100)
-    client.add_user(user, "add user")
+    user = User(user_id, user_name, user_score)
+
+    if op == "add" :
+        client.add_user(user, "add user")
+    elif op == "remove" :
+        client.remove_user(user, "remove user")
 
     # Close!
     transport.close()
 
-# 常见处理
+def main():
+    for line in stdin:
+        op, user_id, user_name, user_score = line.split(' ')
+        operate(op, int(user_id), user_name, int(user_score)) # Python实际上是强类型的，即使一般情况下不用写类型
+
+# 常见处理方式
 if __name__ == "__main__":
     main()
