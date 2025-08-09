@@ -14,7 +14,9 @@ thrift官方给了类似C++的IDL文件示例（文件后缀为`.thrift`），�
 - 定义相关的数据类型
 - 定义需要的函数
 
-#### 实现匹配服务端 C++
+### 步骤
+
+#### 1. 实现匹配服务端 C++
 
 ```bash
 thrift -r --gen cpp match.thrift
@@ -29,13 +31,25 @@ thrift -r --gen cpp match.thrift
 g++ -o main main.cpp match_server/*.cpp -lthrift
 ```
 
-#### 实现匹配客户端 Python
+#### 2. 实现匹配客户端 Python
 
 ```bash
 thrift -r --gen cpp match.thrift
 ```
 
 会自动生成`gen-py`代码其中，`Match-remote`是**实现服务端接口的示例代码**，但这里是实现客户端因此用不上，官网给了客户端实现的例子[thrift-python-tutorial](https://thrift.apache.org/tutorial/py.html)
+
+#### 3. 改进匹配服务端
+
+实现利用互斥锁和一般队列包装成消息队列通信，实现简单的生成者-消费者模型，其中`unique_lock`和条件变量`condition_variable`实现PV操作。
+
+现在并没有涉及到数据库，只是将数据存储在内存中管理，并且匹配模式简单，用户池中相邻两个用户匹配，匹配后从池子中删除。
+
+
+
+
+
+
 
 
 
