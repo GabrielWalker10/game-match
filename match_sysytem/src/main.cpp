@@ -15,12 +15,20 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 
+
+// 加上作为数据保存客户端的头文件
+#include "save_client/Save.h"
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TTransportUtils.h>
+
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
 
-using namespace  ::match_service;
+// 注意添加命名空间
+using namespace ::match_service;
+using namespace ::save_service;  
 
 struct Task {
     User user;
@@ -53,7 +61,32 @@ public:
 
     void save_result(int a, int b) {
         std::cout << "Match Result: " << a << " " << b << std::endl;
+        
+        // 注意修改为对应的IP地址和端口
+        std::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
+        std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+        std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+        SaveClient client(protocol);
 
+        try {
+            // 打开连接
+            transport->open();
+            // std::cout << "open successed" << std::endl;
+
+            // 下一步在本地实现存储数据服务端
+            // TODO
+            
+            int res = client.save_data("username", "password", a, b);
+            if(res)
+                std::cout << "save successed" << std::endl;
+            else
+                std::cout << "save failed" << std::endl;
+
+            // 关闭连接
+            transport->close();
+        } catch (TException& tx) {
+            std::cout << "ERROR: " << tx.what() << '\n';
+        }
     }
 
     void match() {

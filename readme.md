@@ -39,11 +39,13 @@ thrift -r --gen cpp match.thrift
 
 会自动生成`gen-py`代码其中，`Match-remote`是**实现服务端接口的示例代码**，但这里是实现客户端因此用不上，官网给了客户端实现的例子[thrift-python-tutorial](https://thrift.apache.org/tutorial/py.html)
 
-#### 3. 改进匹配服务端
+#### 3. 改进匹配服务端 V2.0
 
 实现利用互斥锁和一般队列包装成消息队列通信，实现简单的生成者-消费者模型，其中`unique_lock`和条件变量`condition_variable`实现PV操作。
 
 现在并没有涉及到数据库，只是将数据存储在内存中管理，并且匹配模式简单，用户池中相邻两个用户匹配，匹配后从池子中删除。
+
+#### 4. 实现数据保存客户端
 
 
 
@@ -68,3 +70,12 @@ thrift -r --gen cpp match.thrift
 - 当你直接运行一个 Python 文件时，`__name__` 会被置为 `"__main__"`。
 
 - 当这个文件被作为模块导入时，`__name__` 就是模块的名字，而不是 `"__main__"`。
+
+#### Linux上可以使用工具得到md5值
+
+```bash
+md5sum 123456
+# 回车，再ctrl + d结束回车
+```
+
+md5值有单向的特点，用明文能得到唯一的密文，而从密文几乎不可能还原为明文
