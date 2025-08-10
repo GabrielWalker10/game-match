@@ -59,6 +59,10 @@ thrift -r --gen cpp match.thrift
 
 官方给的服务器例子就是多线程的，对照修改代码即可，见[thrift-cpp-tutorial](https://thrift.apache.org/tutorial/cpp.html)的Server一条
 
+#### 7. 改进匹配服务端 V5.0 
+
+修改业务逻辑，按照等待时间扩大匹配范围，符合现实生活中的匹配逻辑
+
 
 
 
@@ -88,7 +92,9 @@ md5sum 123456
 
 md5值有单向的特点，用明文能得到唯一的密文，而从密文几乎不可能还原为明文
 
-#### 关于git diff 
+#### 关于git
+
+**`git diff`命令**
 
 ```bash
 # 查看工作区与暂存区对比
@@ -96,5 +102,19 @@ git diff
 
 # 暂存区与上次提交（HEAD）对比
 git diff --cached [文件名]
+```
+
+**git报错**
+
+```bash
+topeet@DESKTOP-J2H56AA ~/c/a/t/game-match (main)> git add readme.md
+error: insufficient permission for adding an object to repository database .git/objects
+error: readme.md: failed to insert into database
+error: unable to index file 'readme.md'
+fatal: updating files failed
+
+# 可能是当前用户没有当前项目的所有权，可以修改
+# 命令格式sudo chown [新所有者]:[新组] [文件/目录]
+sudo chown -R topeet:topeet ./game-match/
 ```
 

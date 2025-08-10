@@ -2,6 +2,7 @@
 // You should copy it to another filename to avoid overwriting it.
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <thread> 
 #include <mutex>
@@ -55,6 +56,7 @@ class Pool {
     public:
         void add(User user) {
             users.push_back(user);
+            wt.push_back(0); // 从零秒开始记录
         }
 
         void remove(User user) {
@@ -63,6 +65,7 @@ class Pool {
                 if(users[i].id == user.id) {
                     // 删除某一位置上的元素
                     users.erase(users.begin() + i); 
+                    wt.erase(wt.begin() + i);
                 }
             }
         }
@@ -96,27 +99,44 @@ class Pool {
                 std::cout << "ERROR: " << tx.what() << '\n';
             }
         }
+        
+        bool check_match(uint32_t i, uint32_t j) {
+            // 应该同时在互相的区间内才能匹配
+            auto a = users[i], b = users[j];
+            int dt = std::abs(a.score - b.score);
+            // std::cout << "dt: " << dt << std::endl;
+
+            int a_max_dt = wt[i] * 50;  // 前后50可匹配
+            int b_max_dt = wt[j] * 50;  // 前后50可匹配
+            
+            // 注意需要单独满足，因此每次步幅为50
+            return dt <= a_max_dt && dt <= b_max_dt;
+        }
 
         void match() {
+            // 匹配前等待轮数加一
+            for(uint32_t i = 0; i < wt.size(); i ++) {
+                wt[i] ++;
+            }
+
             while(users.size() > 1) {  
-                // 排序函数使用lambda表达式
-                std::sort(users.begin(), users.end(),  [&](User& a, User& b) {
-                        return a.score < b.score;
-                        });
-
                 bool flag = true;
-                for(uint32_t i = 0; i < users.size() - 1; i ++) {
-                    auto a = users[i], b = users[i + 1];
+                for(uint32_t i = 0; i < users.size(); i ++) {
+                    for(uint32_t j = i + 1; j < users.size(); j++) {
+                        auto a = users[i], b = users[j];
+                        if(check_match(i, j)) {
+                            users.erase(users.begin() + j); // 先消除后面个
+                            users.erase(users.begin() + i);
 
-                    // 能够匹配
-                    if(b.score - a.score <= 50) {
-                        // 左闭右开范围
-                        users.erase(users.begin() + i, users.begin() + i + 2);
-                        save_result(a.id, b.id);
-
-                        // 不要接着判断，因为下标已经变了
-                        flag = false;
-                        break;
+                            // 成员时间也应该删除
+                            wt.erase(wt.begin() + j);
+                            wt.erase(wt.begin() + i);
+                            
+                            flag = false;
+                            save_result(a.id, b.id);
+                            // 直接break，因为涉及删除位置乱了，需要重新匹配
+                            break;
+                        }
                     }
                 }
 
@@ -125,12 +145,12 @@ class Pool {
                     // std::cout << "now all users are matched which are qualified" << std::endl;
                     break;
                 }
-
             }
         }
 
     private:
         std::vector<User> users;
+        std::vector<int> wt;   // 当前玩家等待的轮数（对应秒数）
 } pool;  // 定义变量名
 
 // 定义了相关的接口，但是没有具体的业务逻辑，业务逻辑需要实现
@@ -201,6 +221,7 @@ void comsume_task() {
 
             // 解锁
             lck.unlock();
+            // 只在这里匹配，基本上保证固定每秒匹配一次
             pool.match();
             sleep(1);    // 匹配不阻塞，每隔约1s匹配一次
 
@@ -218,14 +239,12 @@ void comsume_task() {
             } else {
                 std::cout << "task type undefined" << std::endl;
             }
-
-            pool.match();
         }
     }
 }
 
 int main(int argc, char **argv) {
-    // 多线程服务器的模式
+    // 多线程服务器的模式，每次调用一次函数就创建一个线程
     TThreadedServer server(
             std::make_shared<MatchProcessorFactory>(std::make_shared<MatchCloneFactory>()),
             std::make_shared<TServerSocket>(9090), //port
