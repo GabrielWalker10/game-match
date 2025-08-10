@@ -47,9 +47,17 @@ thrift -r --gen cpp match.thrift
 
 #### 4. 实现数据保存客户端
 
+官方C++客户端和服务端的样例，见[thrift-cpp-tutorial](https://thrift.apache.org/tutorial/cpp.html)
 
+#### 5. 改进匹配服务端 V3.0
 
+改进匹配方式，现在为分差匹配，当池子中某两个用户分差50以内，匹配成功
 
+#### 6. 改进匹配服务端 V4.0 
+
+引入**多线程**实现的服务端，现在生产者-消费者模型的服务端是多线程，并且条件变量保证线程安全
+
+官方给的服务器例子就是多线程的，对照修改代码即可，见[thrift-cpp-tutorial](https://thrift.apache.org/tutorial/cpp.html)的Server一条
 
 
 
@@ -79,3 +87,14 @@ md5sum 123456
 ```
 
 md5值有单向的特点，用明文能得到唯一的密文，而从密文几乎不可能还原为明文
+
+#### 关于git diff 
+
+```bash
+# 查看工作区与暂存区对比
+git diff
+
+# 暂存区与上次提交（HEAD）对比
+git diff --cached [文件名]
+```
+

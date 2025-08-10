@@ -23,6 +23,12 @@
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
+// 添加多线程头文件
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/concurrency/ThreadFactory.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/TToString.h>
+
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
@@ -46,85 +52,85 @@ struct MessagQueue {
 
 // 用户匹配池
 class Pool {
-public:
-    void add(User user) {
-        users.push_back(user);
-    }
-
-    void remove(User user) {
-        // 查找并删除
-        for(uint32_t i = 0; i < users.size(); i ++) {  // 使用unint32_t消除warning，写工程最好零warning
-            if(users[i].id == user.id) {
-                // 删除某一位置上的元素
-                users.erase(users.begin() + i); 
-            }
+    public:
+        void add(User user) {
+            users.push_back(user);
         }
-    }
 
-    void save_result(int a, int b) {
-        std::cout << "Match Result: " << a << " " << b << std::endl;
-        
-        // 注意修改为对应的IP地址和端口
-        std::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
-        std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-        std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-        SaveClient client(protocol);
-
-        try {
-            // 打开连接
-            transport->open();
-            // std::cout << "open successed" << std::endl;
-
-            // 下一步在本地实现存储数据服务端
-            // TODO
-
-            int res = client.save_data("username", "password", a, b);
-            if(res)
-                std::cout << "save successed" << std::endl;
-            else
-                std::cout << "save failed" << std::endl;
-
-            // 关闭连接
-            transport->close();
-        } catch (TException& tx) {
-            std::cout << "ERROR: " << tx.what() << '\n';
-        }
-    }
-
-    void match() {
-        while(users.size() > 1) {  
-            // 排序函数使用lambda表达式
-            std::sort(users.begin(), users.end(),  [&](User& a, User& b) {
-                return a.score < b.score;
-            });
-
-            bool flag = true;
-            for(uint32_t i = 0; i < users.size() - 1; i ++) {
-                auto a = users[i], b = users[i + 1];
-                
-                // 能够匹配
-                if(b.score - a.score <= 50) {
-                    // 左闭右开范围
-                    users.erase(users.begin() + i, users.begin() + i + 2);
-                    save_result(a.id, b.id);
-                    
-                    // 不要接着判断，因为下标已经变了
-                    flag = false;
-                    break;
+        void remove(User user) {
+            // 查找并删除
+            for(uint32_t i = 0; i < users.size(); i ++) {  // 使用unint32_t消除warning，写工程最好零warning
+                if(users[i].id == user.id) {
+                    // 删除某一位置上的元素
+                    users.erase(users.begin() + i); 
                 }
             }
-
-            // 将池子中符号要求的匹配完，且防止死循环
-            if(flag) {
-                // std::cout << "now all users are matched which are qualified" << std::endl;
-                break;
-            }
-                
         }
-    }
 
-private:
-    std::vector<User> users;
+        void save_result(int a, int b) {
+            std::cout << "Match Result: " << a << " " << b << std::endl;
+
+            // 注意修改为对应的IP地址和端口
+            std::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
+            std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+            std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+            SaveClient client(protocol);
+
+            try {
+                // 打开连接
+                transport->open();
+                // std::cout << "open successed" << std::endl;
+
+                // 下一步在本地实现存储数据服务端
+                // TODO
+
+                int res = client.save_data("username", "password", a, b);
+                if(res)
+                    std::cout << "save successed" << std::endl;
+                else
+                    std::cout << "save failed" << std::endl;
+
+                // 关闭连接
+                transport->close();
+            } catch (TException& tx) {
+                std::cout << "ERROR: " << tx.what() << '\n';
+            }
+        }
+
+        void match() {
+            while(users.size() > 1) {  
+                // 排序函数使用lambda表达式
+                std::sort(users.begin(), users.end(),  [&](User& a, User& b) {
+                        return a.score < b.score;
+                        });
+
+                bool flag = true;
+                for(uint32_t i = 0; i < users.size() - 1; i ++) {
+                    auto a = users[i], b = users[i + 1];
+
+                    // 能够匹配
+                    if(b.score - a.score <= 50) {
+                        // 左闭右开范围
+                        users.erase(users.begin() + i, users.begin() + i + 2);
+                        save_result(a.id, b.id);
+
+                        // 不要接着判断，因为下标已经变了
+                        flag = false;
+                        break;
+                    }
+                }
+
+                // 将池子中符号要求的匹配完，且防止死循环
+                if(flag) {
+                    // std::cout << "now all users are matched which are qualified" << std::endl;
+                    break;
+                }
+
+            }
+        }
+
+    private:
+        std::vector<User> users;
 } pool;  // 定义变量名
 
 // 定义了相关的接口，但是没有具体的业务逻辑，业务逻辑需要实现
@@ -137,7 +143,7 @@ class MatchHandler : virtual public MatchIf {
         int32_t add_user(const User& user, const std::string& info) {
             // Your implementation goes here
             printf("add_user\n");
-            
+
             // 访问互斥资源上锁
             std::unique_lock<std::mutex> lck(message_queue.m);  // RAII原则，并且比lock_guard更灵活
             message_queue.q.push({user, "add"});
@@ -158,6 +164,30 @@ class MatchHandler : virtual public MatchIf {
         }
 
 };
+
+// 定义线程池
+class MatchCloneFactory : virtual public MatchIfFactory {
+    public:
+        ~MatchCloneFactory() override = default;
+        MatchIf* getHandler(const ::apache::thrift::TConnectionInfo& connInfo) override
+        {
+            std::shared_ptr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
+            
+            // std::cout << "Incoming connection\n";
+            // std::cout << "\tSocketInfo: "  << sock->getSocketInfo() << "\n";
+            // std::cout << "\tPeerHost: "    << sock->getPeerHost() << "\n";
+            // std::cout << "\tPeerAddress: " << sock->getPeerAddress() << "\n";
+            // std::cout << "\tPeerPort: "    << sock->getPeerPort() << "\n";
+
+            return new MatchHandler;
+        }
+
+        // 注意修改为MatchIf
+        void releaseHandler(MatchIf* handler) override {
+            delete handler;
+        }
+};
+
 
 /**
  * 消费者线程任务，作用是不断执行增删任务并持续匹配
@@ -195,21 +225,19 @@ void comsume_task() {
 }
 
 int main(int argc, char **argv) {
-    int port = 9090;
-    ::std::shared_ptr<MatchHandler> handler(new MatchHandler());
-    ::std::shared_ptr<TProcessor> processor(new MatchProcessor(handler));
-    ::std::shared_ptr<TServerTransport> serverTransport(new TServerSocket(port));
-    ::std::shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
-    ::std::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
-
-    TSimpleServer server(processor, serverTransport, transportFactory, protocolFactory);
+    // 多线程服务器的模式
+    TThreadedServer server(
+            std::make_shared<MatchProcessorFactory>(std::make_shared<MatchCloneFactory>()),
+            std::make_shared<TServerSocket>(9090), //port
+            std::make_shared<TBufferedTransportFactory>(),
+            std::make_shared<TBinaryProtocolFactory>());
 
     std::cout << "start match server" << std::endl;
 
     // 创建工作线程（增删用户池，持续匹配）
     std::thread match_thread(comsume_task);
     server.serve();
-    
+
     return 0;
 }
 
