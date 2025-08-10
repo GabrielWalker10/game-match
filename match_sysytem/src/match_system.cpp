@@ -53,104 +53,104 @@ struct MessagQueue {
 
 // 用户匹配池
 class Pool {
-    public:
-        void add(User user) {
-            users.push_back(user);
-            wt.push_back(0); // 从零秒开始记录
-        }
+public:
+    void add(User user) {
+        users.push_back(user);
+        wt.push_back(0); // 从零秒开始记录
+    }
 
-        void remove(User user) {
-            // 查找并删除
-            for(uint32_t i = 0; i < users.size(); i ++) {  // 使用unint32_t消除warning，写工程最好零warning
-                if(users[i].id == user.id) {
-                    // 删除某一位置上的元素
-                    users.erase(users.begin() + i); 
-                    wt.erase(wt.begin() + i);
-                }
+    void remove(User user) {
+        // 查找并删除
+        for(uint32_t i = 0; i < users.size(); i ++) {  // 使用unint32_t消除warning，写工程最好零warning
+            if(users[i].id == user.id) {
+                // 删除某一位置上的元素
+                users.erase(users.begin() + i); 
+                wt.erase(wt.begin() + i);
             }
         }
+    }
 
-        void save_result(int a, int b) {
-            std::cout << "Match Result: " << a << " " << b << std::endl;
+    void save_result(int a, int b) {
+        std::cout << "Match Result: " << a << " " << b << std::endl;
 
-            // 注意修改为对应的IP地址和端口
-            std::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
-            std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-            std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-            SaveClient client(protocol);
+        // 注意修改为对应的IP地址和端口
+        std::shared_ptr<TTransport> socket(new TSocket("localhost", 7070));
+        std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+        std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+        SaveClient client(protocol);
 
-            try {
-                // 打开连接
-                transport->open();
-                // std::cout << "open successed" << std::endl;
+        try {
+            // 打开连接
+            transport->open();
+            // std::cout << "open successed" << std::endl;
 
-                // 下一步在本地实现存储数据服务端
-                // TODO
+            // 下一步在本地实现存储数据服务端
+            int res = client.save_data("gabrielwalker", "a5dc1f7b", a, b);
+            if(!res)
+                std::cout << "save successed" << std::endl;
+            else
+                std::cout << "save failed" << std::endl;
 
-                int res = client.save_data("username", "password", a, b);
-                if(res)
-                    std::cout << "save successed" << std::endl;
-                else
-                    std::cout << "save failed" << std::endl;
-
-                // 关闭连接
-                transport->close();
-            } catch (TException& tx) {
-                std::cout << "ERROR: " << tx.what() << '\n';
-            }
+            // 关闭连接
+            transport->close();
+        } catch (TException& tx) {
+            std::cout << "ERROR: " << tx.what() << '\n';
         }
+    }
+    
+    bool check_match(uint32_t i, uint32_t j) {
+        // 应该同时在互相的区间内才能匹配
+        auto a = users[i], b = users[j];
+        int dt = std::abs(a.score - b.score);
+        // std::cout << "dt: " << dt << std::endl;
+
+        int a_max_dt = wt[i] * 50;  // 前后50可匹配
+        int b_max_dt = wt[j] * 50;  // 前后50可匹配
         
-        bool check_match(uint32_t i, uint32_t j) {
-            // 应该同时在互相的区间内才能匹配
-            auto a = users[i], b = users[j];
-            int dt = std::abs(a.score - b.score);
-            // std::cout << "dt: " << dt << std::endl;
+        // 注意需要单独满足，因此每次步幅为50
+        return dt <= a_max_dt && dt <= b_max_dt;
+    }
 
-            int a_max_dt = wt[i] * 50;  // 前后50可匹配
-            int b_max_dt = wt[j] * 50;  // 前后50可匹配
-            
-            // 注意需要单独满足，因此每次步幅为50
-            return dt <= a_max_dt && dt <= b_max_dt;
+    void match() {
+        // 匹配前等待轮数加一
+        for(uint32_t i = 0; i < wt.size(); i ++) {
+            wt[i] ++;
         }
 
-        void match() {
-            // 匹配前等待轮数加一
-            for(uint32_t i = 0; i < wt.size(); i ++) {
-                wt[i] ++;
-            }
+        while(users.size() > 1) {  
+            bool flag = true;
+            for(uint32_t i = 0; i < users.size(); i ++) {
+                for(uint32_t j = i + 1; j < users.size(); j++) {
+                    auto a = users[i], b = users[j];
+                    if(check_match(i, j)) {
+                        users.erase(users.begin() + j); // 先消除后面个
+                        users.erase(users.begin() + i);
+                        // 成员时间也应该删除
+                        wt.erase(wt.begin() + j);
+                        wt.erase(wt.begin() + i);
+                    
+                        save_result(a.id, b.id);
 
-            while(users.size() > 1) {  
-                bool flag = true;
-                for(uint32_t i = 0; i < users.size(); i ++) {
-                    for(uint32_t j = i + 1; j < users.size(); j++) {
-                        auto a = users[i], b = users[j];
-                        if(check_match(i, j)) {
-                            users.erase(users.begin() + j); // 先消除后面个
-                            users.erase(users.begin() + i);
-
-                            // 成员时间也应该删除
-                            wt.erase(wt.begin() + j);
-                            wt.erase(wt.begin() + i);
-                            
-                            flag = false;
-                            save_result(a.id, b.id);
-                            // 直接break，因为涉及删除位置乱了，需要重新匹配
-                            break;
-                        }
+                        flag = false;    
+                        // 直接break，因为涉及删除位置乱了，需要重新匹配
+                        break;
                     }
                 }
+                // 注意退出重新匹配，因为位置乱了
+                if(!flag) break;
+            }
 
-                // 将池子中符号要求的匹配完，且防止死循环
-                if(flag) {
-                    // std::cout << "now all users are matched which are qualified" << std::endl;
-                    break;
-                }
+            // 将池子中符号要求的匹配完，且防止死循环
+            if(flag) {
+                // std::cout << "now all users are matched which are qualified" << std::endl;
+                break;
             }
         }
+    }
 
-    private:
-        std::vector<User> users;
-        std::vector<int> wt;   // 当前玩家等待的轮数（对应秒数）
+private:
+    std::vector<User> users;
+    std::vector<int> wt;   // 当前玩家等待的轮数（对应秒数）
 } pool;  // 定义变量名
 
 // 定义了相关的接口，但是没有具体的业务逻辑，业务逻辑需要实现
